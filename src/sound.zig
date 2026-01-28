@@ -19,7 +19,7 @@ pub fn deinit_engine() void {
     ma.ma_engine_uninit(&engine);
 }
 
-pub fn play_file(sound_file: [*:0]u8, stdout: *std.Io.Writer) !void {
+pub fn play_file(sound_file: [*:0]u8) !void {
     var result: ma.ma_result = undefined;
     var sound: ma.ma_sound = undefined;
 
@@ -31,8 +31,6 @@ pub fn play_file(sound_file: [*:0]u8, stdout: *std.Io.Writer) !void {
 
     var song_length: f32 = 0.0;
     _ = ma.ma_sound_get_length_in_seconds(&sound, &song_length);
-    try stdout.print("Playing {s} with duration: {d} seconds\n", .{sound_file, song_length});
-    try stdout.flush();
 
     _ = ma.ma_sound_start(&sound);
 
