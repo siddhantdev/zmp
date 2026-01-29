@@ -22,6 +22,7 @@ const Event = union(enum) {
 pub fn main() !void {
     try sound.init_engine();
     defer sound.deinit_engine();
+    defer sound.deinit_sound();
 
     var arena = std.heap.ArenaAllocator.init(std.heap.c_allocator);
     defer arena.deinit();
@@ -83,6 +84,7 @@ pub fn main() !void {
                     }
                 } else if (key.matches(vaxis.Key.enter, .{})) {
                     std.debug.assert(0 <= selected_index and selected_index < files.items.len);
+                    sound.deinit_sound();
                     try sound.play_file(try allocator.dupeZ(u8, files.items[selected_index]));
                 }
             },

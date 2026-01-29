@@ -4,6 +4,8 @@ const ma = @cImport({
 });
 
 var engine: ma.ma_engine = undefined;
+var sound: ma.ma_sound = undefined;
+var sound_init = false;
 
 pub fn init_engine() !void {
     var result: ma.ma_result = undefined;
@@ -21,18 +23,19 @@ pub fn deinit_engine() void {
 
 pub fn play_file(sound_file: [*:0]u8) !void {
     var result: ma.ma_result = undefined;
-    var sound: ma.ma_sound = undefined;
 
     result = ma.ma_sound_init_from_file(&engine, sound_file, 0, null, null, &sound);
     if (result != ma.MA_SUCCESS) {
         return error.CouldNotLoadSound;
     }
-    defer ma.ma_sound_uninit(&sound);
-
-    var song_length: f32 = 0.0;
-    _ = ma.ma_sound_get_length_in_seconds(&sound, &song_length);
+    sound_init = true;
 
     _ = ma.ma_sound_start(&sound);
+}
 
-    while (ma.ma_sound_is_playing(&sound) == 1) {}
+pub fn deinit_sound() void {
+    if (sound_init) {
+        ma.ma_sound_uninit(&sound);
+        sound_init = false;
+    }
 }
