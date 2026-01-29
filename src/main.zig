@@ -76,8 +76,11 @@ pub fn main() !void {
                         selected_index = 0;
                     }
                 } else if (key.matches('k', .{})) {
-                    if (selected_index > 0)
+                    if (selected_index > 0) {
                         selected_index -= 1;
+                    } else {
+                        selected_index = files.items.len - 1;
+                    }
                 } else if (key.matches(vaxis.Key.enter, .{})) {
                     std.debug.assert(0 <= selected_index and selected_index < files.items.len);
                     try sound.play_file(try allocator.dupeZ(u8, files.items[selected_index]));
@@ -93,14 +96,14 @@ pub fn main() !void {
         var y_offset: i17 = 1;
         const item_height = 1;
         for (files.items, 0..) |file_name, i| {
-            const file_child = win.child(.{ 
+            const file_child = win.child(.{
                 .x_off = 2,
                 .y_off = y_offset,
                 .width = win.width / 2,
                 .height = item_height,
                 .border = .{ .where = .none },
             });
-            file_child.fill(vaxis.Cell {
+            file_child.fill(vaxis.Cell{
                 .style = if (i == selected_index) selected_item_style else list_item_style,
             });
             _ = file_child.print(&.{.{
