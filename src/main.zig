@@ -2,6 +2,7 @@ const std = @import("std");
 const ma = @cImport({
     @cInclude("miniaudio.h");
 });
+const util = @import("util.zig");
 const sound = @import("sound.zig");
 const vaxis = @import("vaxis");
 
@@ -38,7 +39,7 @@ pub fn main() !void {
 
     var iter = dir.iterate();
     while (try iter.next()) |entry| {
-        if (std.mem.endsWith(u8, entry.name, ".mp3") or std.mem.endsWith(u8, entry.name, ".wav"))
+        if (entry.kind == .file and try util.is_audio_file(entry.name))
             try files.append(allocator, entry.name);
     }
 
