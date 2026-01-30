@@ -44,8 +44,12 @@ pub fn main() !void {
             try files.append(allocator, entry.name);
     }
 
-    const list_item_style: vaxis.Style = .{ .bg = .rgbFromUint(0x000000), .fg = .rgbFromUint(0xFF0000) };
-    const selected_item_style: vaxis.Style = .{ .bg = .rgbFromUint(0xFFFFFF), .fg = .rgbFromUint(0xFF0000) };
+    const bg_color: vaxis.Color = .rgbFromUint(0x1F1F1F);
+    const text_color: vaxis.Color = .rgbFromUint(0xEEEEEE);
+    const bg_style: vaxis.Style = .{ .bg = bg_color };
+    const list_item_style: vaxis.Style = .{ .bg = bg_color, .fg = text_color };
+    const header_item_style: vaxis.Style = .{ .bg = bg_color, .fg = text_color, .bold = true };
+    const selected_item_style: vaxis.Style = .{ .bg = text_color, .fg = bg_color };
 
     var vx = try vaxis.init(allocator, .{});
     defer vx.deinit(allocator, tty.writer());
@@ -95,17 +99,65 @@ pub fn main() !void {
         const win = vx.window();
         win.clear();
 
-        var y_offset: i17 = 1;
+        win.fill(vaxis.Cell {
+            .style = bg_style,
+        });
+
+        const col_width = (win.width - 6) / 3;
+
+        const file_header_child = win.child(.{
+            .x_off = 3,
+            .y_off = 2,
+            .height = 1,
+            .width = col_width,
+        });
+        file_header_child.fill(.{ .style = bg_style });
+        _ = file_header_child.print(&.{.{
+            .text = "Files",
+            .style = header_item_style,
+        }}, .{
+            .col_offset = col_width / 2 - 2
+        });
+
+        const queue_header_child = win.child(.{
+            .x_off = 3 + col_width,
+            .y_off = 2,
+            .height = 1,
+            .width = col_width,
+        });
+        queue_header_child.fill(.{ .style = bg_style });
+        _ = queue_header_child.print(&.{.{
+            .text = "Queue",
+            .style = header_item_style,
+        }}, .{
+            .col_offset = col_width / 2 - 2
+        });
+
+        const player_header_child = win.child(.{
+            .x_off = 3 + 2 * col_width,
+            .y_off = 2,
+            .height = 1,
+            .width = col_width,
+        });
+        player_header_child.fill(.{ .style = bg_style });
+        _ = player_header_child.print(&.{.{
+            .text = "Player",
+            .style = header_item_style,
+        }}, .{
+            .col_offset = col_width / 2 - 3
+        });
+
+        var y_offset: i17 = 3;
         const item_height = 1;
         for (files.items, 0..) |file_name, i| {
             const file_child = win.child(.{
-                .x_off = 2,
+                .x_off = 3,
                 .y_off = y_offset,
-                .width = win.width / 2,
+                .width = col_width,
                 .height = item_height,
                 .border = .{ .where = .none },
             });
-            file_child.fill(vaxis.Cell{
+            file_child.fill(vaxis.Cell {
                 .style = if (i == selected_index) selected_item_style else list_item_style,
             });
             _ = file_child.print(&.{.{
