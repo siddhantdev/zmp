@@ -15,8 +15,7 @@ const stdout = &stdout_writer.interface;
 const Event = union(enum) {
     key_press: vaxis.Key,
     winsize: vaxis.Winsize,
-    focus_in,
-    foo: u8,
+    none,
 };
 
 pub fn main() !void {
@@ -68,7 +67,7 @@ pub fn main() !void {
 
     var selected_index: usize = 0;
     while (true) {
-        const event = loop.nextEvent();
+        const event = if (loop.tryEvent()) |evt| evt else .none;
         switch (event) {
             .key_press => |key| {
                 if (key.matches('c', .{ .ctrl = true }) or key.matches('q', .{})) {
@@ -99,11 +98,11 @@ pub fn main() !void {
         const win = vx.window();
         win.clear();
 
-        win.fill(vaxis.Cell {
+        win.fill(vaxis.Cell{
             .style = bg_style,
         });
 
-        const col_width = (win.width - 6) / 3;
+        const col_width = (win.width - 6) / 4;
 
         const file_header_child = win.child(.{
             .x_off = 3,
@@ -112,40 +111,10 @@ pub fn main() !void {
             .width = col_width,
         });
         file_header_child.fill(.{ .style = bg_style });
-        _ = file_header_child.print(&.{.{
+        _ = file_header_child.printSegment(.{
             .text = "Files",
             .style = header_item_style,
-        }}, .{
-            .col_offset = col_width / 2 - 2
-        });
-
-        const queue_header_child = win.child(.{
-            .x_off = 3 + col_width,
-            .y_off = 2,
-            .height = 1,
-            .width = col_width,
-        });
-        queue_header_child.fill(.{ .style = bg_style });
-        _ = queue_header_child.print(&.{.{
-            .text = "Queue",
-            .style = header_item_style,
-        }}, .{
-            .col_offset = col_width / 2 - 2
-        });
-
-        const player_header_child = win.child(.{
-            .x_off = 3 + 2 * col_width,
-            .y_off = 2,
-            .height = 1,
-            .width = col_width,
-        });
-        player_header_child.fill(.{ .style = bg_style });
-        _ = player_header_child.print(&.{.{
-            .text = "Player",
-            .style = header_item_style,
-        }}, .{
-            .col_offset = col_width / 2 - 3
-        });
+        }, .{ .col_offset = col_width / 2 - 2 });
 
         var y_offset: i17 = 3;
         const item_height = 1;
@@ -157,14 +126,103 @@ pub fn main() !void {
                 .height = item_height,
                 .border = .{ .where = .none },
             });
-            file_child.fill(vaxis.Cell {
+            file_child.fill(vaxis.Cell{
                 .style = if (i == selected_index) selected_item_style else list_item_style,
             });
-            _ = file_child.print(&.{.{
+            _ = file_child.printSegment(.{
                 .text = file_name,
                 .style = if (i == selected_index) selected_item_style else list_item_style,
-            }}, .{});
+            }, .{});
             y_offset += item_height;
+        }
+
+        const queue_header_child = win.child(.{
+            .x_off = 3 + col_width,
+            .y_off = 2,
+            .height = 1,
+            .width = col_width,
+        });
+        queue_header_child.fill(.{ .style = bg_style });
+        _ = queue_header_child.printSegment(.{
+            .text = "Queue",
+            .style = header_item_style,
+        }, .{ .col_offset = col_width / 2 - 2 });
+
+        const player_header_child = win.child(.{
+            .x_off = 3 + 2 * col_width,
+            .y_off = 2,
+            .height = 1,
+            .width = col_width * 2,
+        });
+        player_header_child.fill(.{ .style = bg_style });
+        _ = player_header_child.printSegment(.{
+            .text = "Player",
+            .style = header_item_style,
+        }, .{ .col_offset = col_width - 3 });
+
+        var total_len_s = sound.get_sound_len();
+
+        if (total_len_s > 0) {
+            var duration_finished_s = sound.get_sound_done();
+            const duration_ratio = duration_finished_s / total_len_s;
+
+            const duration_finished_m = @floor(duration_finished_s / 60);
+            duration_finished_s = @rem(duration_finished_s, 60);
+
+            const total_len_m = @floor(total_len_s / 60);
+            total_len_s = @rem(total_len_s, 60);
+
+            const duration_finished_text = try std.fmt.allocPrint(allocator, "{d:0>2}:{d:0>2.0}", .{ duration_finished_m, duration_finished_s });
+            const total_duration_text = try std.fmt.allocPrint(allocator, "{d:0>2}:{d:0>2.0}", .{ total_len_m, total_len_s });
+
+            const bar_width: f32 = @floatFromInt(col_width * 2 - 20);
+            const done_width: u16 = @intFromFloat(duration_ratio * bar_width);
+            const bar_child = win.child(.{
+                .x_off = 3 + 2 * col_width + 2 + @as(i17, @intCast(duration_finished_text.len)),
+                .y_off = win.height - 6,
+                .height = 1,
+                .width = @intFromFloat(bar_width),
+            });
+            bar_child.fill(.{ .style = selected_item_style });
+
+            const done_text_child = win.child(.{
+                .x_off = 3 + 2 * col_width + 1,
+                .y_off = bar_child.y_off,
+                .height = 1,
+            });
+            _ = done_text_child.printSegment(.{
+                .text = duration_finished_text,
+                .style = list_item_style,
+            }, .{});
+
+            const total_text_child = win.child(.{
+                .x_off = bar_child.x_off + bar_child.width + 1,
+                .y_off = bar_child.y_off,
+                .height = 1,
+            });
+            _ = total_text_child.printSegment(.{
+                .text = total_duration_text,
+                .style = list_item_style,
+            }, .{});
+
+            const done_bar_child = win.child(.{
+                .x_off = bar_child.x_off,
+                .y_off = bar_child.y_off,
+                .height = 1,
+                .width = done_width,
+            });
+            done_bar_child.fill(.{ .style = .{ .bg = .rgbFromUint(0xFF5F5F) } });
+
+            const name = sound.get_sound_name();
+            const name_child = win.child(.{
+                .x_off = player_header_child.x_off + (player_header_child.width - @as(u16, @intCast(name.len))) / 2,
+                .y_off = bar_child.y_off - 2,
+                .height = 1,
+            });
+            _ = name_child.printSegment(.{
+                .text = name,
+                .style = list_item_style,
+            }, .{});
         }
 
         try vx.render(tty.writer());
