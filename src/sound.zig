@@ -23,6 +23,7 @@ pub fn deinit_engine() void {
 }
 
 pub fn play_file(sound_file: [*:0]u8) !void {
+    deinit_sound();
     var result: ma.ma_result = undefined;
 
     result = ma.ma_sound_init_from_file(&engine, sound_file, 0, null, null, &sound);
@@ -59,4 +60,8 @@ pub fn get_sound_len() f32 {
 
 pub fn get_sound_name() []u8 {
     return std.mem.span(sound_name);
+}
+
+pub fn is_sound_finished() bool {
+    return (ma.ma_sound_at_end(&sound) == 1);
 }
