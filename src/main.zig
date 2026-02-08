@@ -230,7 +230,7 @@ pub fn main() !void {
             .style = header_item_style,
         }, .{ .col_offset = col_width - 3 });
 
-        if (sound.is_sound_finished() and currently_playing_index < queue.items.len) {
+        if (sound.is_sound_finished() and currently_playing_index < queue.items.len - 1) {
             currently_playing_index += 1;
             try sound.play_file(try allocator.dupeZ(u8, queue.items[currently_playing_index]));
         }
