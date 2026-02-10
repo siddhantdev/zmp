@@ -52,8 +52,13 @@ pub fn main() !void {
     var iter = dir.iterate();
     while (try iter.next()) |entry| {
         if (entry.kind == .file and try util.is_audio_file(entry.name))
-            try files.append(allocator, entry.name);
+            try files.append(allocator, try allocator.dupe(u8, entry.name));
     }
+    std.mem.sortUnstable([]const u8, files.items, {}, struct {
+        fn lessThan(_: void, lhs: []const u8, rhs: []const u8) bool {
+            return std.mem.order(u8, lhs, rhs) == .lt;
+        }
+    }.lessThan);
 
     var queue: ArrayList([]const u8) = .empty;
     defer queue.deinit(allocator);
@@ -312,10 +317,27 @@ fn renderList(
     width: u16,
     opts: RenderListOpts,
 ) void {
+    if (list.items.len == 0) return;
+
     var y_offset: i17 = 3;
     const item_height = 1;
 
-    for (list.items, 0..) |item, i| {
+    const start_index = blk: {
+        if (opts.index >= win.height - 10) {
+            break :blk opts.index - (win.height - 10);
+        }
+        break :blk 0;
+    };
+
+    const end_index = blk: {
+        if (opts.index >= win.height - 10) {
+            break :blk @min(opts.index + 6, list.items.len);
+        }
+        break :blk @min(list.items.len, win.height - 4);
+    };
+
+    for (start_index..end_index) |i| {
+        const item = list.items[i];
         const item_child = win.child(.{
             .x_off = x_off,
             .y_off = y_offset,
