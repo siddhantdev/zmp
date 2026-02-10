@@ -12,6 +12,13 @@ var stdout_buffer: [1024]u8 = undefined;
 var stdout_writer = std.fs.File.stdout().writer(&stdout_buffer);
 const stdout = &stdout_writer.interface;
 
+const bg_color: vaxis.Color = .rgbFromUint(0x1F1F1F);
+const text_color: vaxis.Color = .rgbFromUint(0xEEEEEE);
+const bg_style: vaxis.Style = .{ .bg = bg_color };
+const list_item_style: vaxis.Style = .{ .bg = bg_color, .fg = text_color };
+const header_item_style: vaxis.Style = .{ .bg = bg_color, .fg = text_color, .bold = true };
+const selected_item_style: vaxis.Style = .{ .bg = text_color, .fg = bg_color };
+
 const Event = union(enum) {
     key_press: vaxis.Key,
     winsize: vaxis.Winsize,
@@ -50,13 +57,6 @@ pub fn main() !void {
 
     var queue: ArrayList([]const u8) = .empty;
     defer queue.deinit(allocator);
-
-    const bg_color: vaxis.Color = .rgbFromUint(0x1F1F1F);
-    const text_color: vaxis.Color = .rgbFromUint(0xEEEEEE);
-    const bg_style: vaxis.Style = .{ .bg = bg_color };
-    const list_item_style: vaxis.Style = .{ .bg = bg_color, .fg = text_color };
-    const header_item_style: vaxis.Style = .{ .bg = bg_color, .fg = text_color, .bold = true };
-    const selected_item_style: vaxis.Style = .{ .bg = text_color, .fg = bg_color };
 
     var vx = try vaxis.init(allocator, .{});
     defer vx.deinit(allocator, tty.writer());
@@ -148,7 +148,6 @@ pub fn main() !void {
         });
 
         const col_width = (win.width - 6) / 4;
-
         const file_header_child = win.child(.{
             .x_off = 3,
             .y_off = 2,
@@ -161,25 +160,18 @@ pub fn main() !void {
             .style = header_item_style,
         }, .{ .col_offset = col_width / 2 - 2 });
 
-        var y_offset: i17 = 3;
-        const item_height = 1;
-        for (files.items, 0..) |file_name, i| {
-            const file_child = win.child(.{
-                .x_off = file_header_child.x_off,
-                .y_off = y_offset,
-                .width = col_width,
-                .height = item_height,
-                .border = .{ .where = .none },
-            });
-            file_child.fill(vaxis.Cell{
-                .style = if (cursor_state == .FilesCursor and i == selected_index_files) selected_item_style else list_item_style,
-            });
-            _ = file_child.printSegment(.{
-                .text = file_name,
-                .style = if (cursor_state == .FilesCursor and i == selected_index_files) selected_item_style else list_item_style,
-            }, .{});
-            y_offset += item_height;
-        }
+        renderList(
+            win,
+            files,
+            file_header_child.x_off,
+            col_width,
+            .{
+                .active = (cursor_state == .FilesCursor),
+                .index = selected_index_files,
+                .list_type = .FilesCursor,
+                .playing_index = null,
+            },
+        );
 
         const queue_header_child = win.child(.{
             .x_off = 3 + col_width,
@@ -193,30 +185,18 @@ pub fn main() !void {
             .style = header_item_style,
         }, .{ .col_offset = col_width / 2 - 2 });
 
-        y_offset = 3;
-        for (queue.items, 0..) |file_name, i| {
-            const queue_child = win.child(.{
-                .x_off = queue_header_child.x_off + 1,
-                .y_off = y_offset,
-                .width = col_width,
-                .height = item_height,
-                .border = .{ .where = .none },
-            });
-            queue_child.fill(vaxis.Cell{
-                .style = if (cursor_state == .QueueCursor and i == selected_index_queue) selected_item_style else list_item_style,
-            });
-            _ = queue_child.printSegment(.{
-                .text = file_name,
-                .style = if (cursor_state == .QueueCursor and i == selected_index_queue) selected_item_style else list_item_style,
-            }, .{});
-            if (i == currently_playing_index) {
-                _ = queue_child.printSegment(.{
-                    .text = "<",
-                    .style = if (cursor_state == .QueueCursor and i == selected_index_queue) selected_item_style else list_item_style,
-                }, .{ .col_offset = queue_child.width - 2 });
-            }
-            y_offset += item_height;
-        }
+        renderList(
+            win,
+            queue,
+            queue_header_child.x_off + 1,
+            col_width,
+            .{
+                .active = (cursor_state == .QueueCursor),
+                .index = selected_index_queue,
+                .list_type = .QueueCursor,
+                .playing_index = currently_playing_index,
+            },
+        );
 
         const player_header_child = win.child(.{
             .x_off = 3 + 2 * col_width,
@@ -301,5 +281,66 @@ pub fn main() !void {
         }
 
         try vx.render(tty.writer());
+    }
+}
+
+const RenderListOpts = struct {
+    index: usize,
+    active: bool,
+    list_type: CursorState,
+    playing_index: ?usize,
+
+    pub fn init(
+        index: usize,
+        active: bool,
+        list_type: CursorState,
+        playing_index: ?usize,
+    ) RenderListOpts {
+        return RenderListOpts{
+            .index = index,
+            .active = active,
+            .list_type = list_type,
+            .playing_index = playing_index,
+        };
+    }
+};
+
+fn renderList(
+    win: vaxis.Window,
+    list: std.ArrayList([]const u8),
+    x_off: i17,
+    width: u16,
+    opts: RenderListOpts,
+) void {
+    var y_offset: i17 = 3;
+    const item_height = 1;
+
+    for (list.items, 0..) |item, i| {
+        const item_child = win.child(.{
+            .x_off = x_off,
+            .y_off = y_offset,
+            .width = width,
+            .height = item_height,
+            .border = .{ .where = .none },
+        });
+
+        const style = if (opts.active and i == opts.index) selected_item_style else list_item_style;
+
+        item_child.fill(vaxis.Cell{
+            .style = style,
+        });
+        _ = item_child.printSegment(.{
+            .text = item,
+            .style = style,
+        }, .{});
+
+        if (opts.list_type == .QueueCursor and i == opts.playing_index.?) {
+            _ = item_child.printSegment(.{
+                .text = "<",
+                .style = style,
+            }, .{ .col_offset = item_child.width - 2 });
+        }
+
+        y_offset += item_height;
     }
 }
