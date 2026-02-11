@@ -139,6 +139,18 @@ pub fn main() !void {
                     if (selected_index_queue >= queue.items.len) {
                         selected_index_queue = queue.items.len - 1;
                     }
+                } else if (key.matches('g', .{})) {
+                    if (cursor_state == .QueueCursor) {
+                        selected_index_queue = 0;
+                    } else {
+                        selected_index_files = 0;
+                    }
+                } else if (key.matches('g', .{ .shift = true })) {
+                    if (cursor_state == .QueueCursor) {
+                        selected_index_queue = queue.items.len - 1;
+                    } else {
+                        selected_index_files = files.items.len - 1;
+                    }
                 }
             },
             .winsize => |ws| try vx.resize(allocator, tty.writer(), ws),
