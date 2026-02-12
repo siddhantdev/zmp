@@ -151,6 +151,18 @@ pub fn main() !void {
                     } else {
                         selected_index_files = files.items.len - 1;
                     }
+                } else if (key.matches('p', .{})) {
+                    sound.flip_sound_state();
+                } else if (key.matches('n', .{})) {
+                    if (currently_playing_index < queue.items.len - 1) {
+                        currently_playing_index += 1;
+                        try sound.play_file(try allocator.dupeZ(u8, queue.items[currently_playing_index]));
+                    }
+                } else if (key.matches('b', .{})) {
+                    if (currently_playing_index > 0) {
+                        currently_playing_index -= 1;
+                        try sound.play_file(try allocator.dupeZ(u8, queue.items[currently_playing_index]));
+                    }
                 }
             },
             .winsize => |ws| try vx.resize(allocator, tty.writer(), ws),

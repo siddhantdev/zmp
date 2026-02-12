@@ -76,3 +76,29 @@ pub fn is_sound_finished() bool {
 
     return (ma.ma_sound_at_end(&sound.?) == 1);
 }
+
+pub fn flip_sound_state() void {
+    if (sound == null) return;
+
+    if (ma.ma_sound_is_playing(&sound.?) == 1) {
+        pause_sound();
+    } else  {
+        play_sound();
+    }
+}
+
+pub fn pause_sound() void {
+    if (sound == null) {
+        return;
+    }
+
+    _ = ma.ma_sound_stop(&sound.?);
+}
+
+pub fn play_sound() void {
+    if (sound == null) {
+        return;
+    }
+
+    _ = ma.ma_sound_start(&sound.?);
+}
